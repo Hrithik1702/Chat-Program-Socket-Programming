@@ -1,0 +1,77 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <ctype.h> 
+#define PORT     8080
+#define MAXLINE 1024
+  
+// Driver code
+int main() {
+    int sockfd;
+    char buffer[MAXLINE];
+    char ack[200] = "ACK FOR FRAME ";
+    struct sockaddr_in servaddr, cliaddr;
+      
+    // Creating socket file descriptor
+    sockfd = socket(PF_INET, SOCK_DGRAM, 0);
+    if ( sockfd < 0 ) {
+        printf("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+      
+    bzero(&servaddr,sizeof(servaddr));
+    bzero(&cliaddr,sizeof(cliaddr));
+      
+    // Filling server information
+    servaddr.sin_family    = PF_INET;
+    servaddr.sin_addr.s_addr = INADDR_ANY;
+    servaddr.sin_port = htons(PORT);
+      
+    // Bind the socket with the server address
+    int b = bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+    if (  b < 0 )
+    {
+        printf("bind failed");
+        exit(EXIT_FAILURE);
+    }
+    int len, n;
+    int seqnum=0;
+    len = sizeof(cliaddr);  
+    while(1)
+    {
+    	    strcpy(ack,"ACK FOR FRAME  ");
+	    n = recvfrom(sockfd, (char *)buffer, MAXLINE, 0, ( struct sockaddr *) &cliaddr,&len);
+	    buffer[n] = '\0';
+	    if(strcmp(buffer,"exit")==0)
+	    {
+	    	break;
+	    }
+	    printf("%s \n",buffer);
+	    int flag =1;
+	    ack[14]=buffer[n-1];
+            printf("%s %c %c %c\n",ack,buffer[n-1],(char)(seqnum+48),ack[14]);
+	    if((char)(seqnum+48)==buffer[n-1])
+	    {
+		    sendto(sockfd, (char *)ack, strlen(ack), 0, (struct sockaddr *) &cliaddr,len);
+		    printf("Acknowledge sent for frame %c\n",buffer[n-1]); 
+	     }
+	    else
+	    {
+		 strcpy(ack,"NACK FOR FRAME  ");
+		 sendto(sockfd, (char *)ack, strlen(ack), 0, (struct sockaddr *) &cliaddr,len);
+		 printf("Negative Acknowledge sent for frame %c\n",buffer[n-1]); 
+            }
+
+	     seqnum = (seqnum+1)%8;
+
+    }
+    
+    printf("Server Exit....\n");
+    close(sockfd);
+    return 0;
+}
